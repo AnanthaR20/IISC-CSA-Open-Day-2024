@@ -1,0 +1,358 @@
+---
+title: "IISc CSA PINathlon - Open Day 2024 Summary"
+date: "2024-03-04"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE,message = FALSE)
+source("./analysis.R")
+```
+
+This reports provides a summary of the data collected on 6 password/PIN entry games developed for the purpose of resisting shoulder-surfing attacks while also retaining usability for the user. The following provides an outline of the organization for this report:  
+1. Summary of Data Collected  
+2. Variables  
+3. Usability / Results  
+|  a. Demographic Analysis: Participant Demographics, Effect of Demographics on Game Performance
+|  b. Qualitative Analysis: Perceived Difficulty, Correlation with Quant difficulty 
+|  c. Quantitative Analysis: Success Rate, Digit Score, Duration
+4. Conclusion / Future Work
+---  
+
+# 1. Summary of Data Collected
+
+|   On open day, we captured data in three tables: a 'User Table' an 'Instance Table', and a 'Exit Survey Table' 
+|   The User Table keeps track of each user's points and each user's PIN. Aside from providing an answer key(user's registered PIN) while users played, this table was primarily used for the benefit of keeping track of points and distributing prizes on Open day.  
+|   The Instance Table, contains all the rest of the data needed for analysis. Each row in the instance table is an instance of a game played by a user. Which is to say each row records the user id of the player, the game played, timestamps, the result PIN from playing the game, etc. From this we can extract the variables of interest.  
+|   The Exit Survey Table contains both demographic info about some of the participants as well as some qualitative variables regarding perceived difficulty of the games. We asked participants for their user id here to tie the data together.
+  
+|  Here are summaries of the Instance Table and Exit Survey Table.  
+
+Instance Table - across Instances
+```{r, cols.print=6}
+(instances_summary_table)
+```
+
+Instance Table - across Users
+```{r, cols.print=6}
+(users_summary_table)
+```
+
+Exit Survey Summary
+```{r, cols.print=6}
+(survey_summary_table)
+```
+
+
+# 2. Variables  
+
+|   In addition to some user demographics, we captured both quantitative and qualitative variables. We derived the following variables from the Instance Table for each participant and game. 
+
+*Demographic*  
+|   1. **Age**    
+|   2. **Gender**  
+|   3. **Education Level**  
+|   4. **Occupation**  
+|   5. **Phone Model**  
+
+*Qualitative*  
+|   1. **Game Difficulty**: Likert scale of difficulty (1-5) pu/pg  
+|   2. **Favorite Games**: textual list of favorited games  
+|   3. **Challenging Design Aspects**: open text field noting challenges  
+
+*Quantitative*  
+|   1. **Instance count**: total instances initiated per user per game  
+|   2. **Success Rate**: successful instances over all instances pu/pg  
+|   3. **Failure Rate**: failed instances over all instances pu/pg  
+|   4. **Abort Rate**: aborted instances overl all instances pu/pg  
+|   5. **Digit Score**: average # digits correct across instances  
+|   6. **Duration**: average PIN Entry Time across instances  
+|   7. **Quickest Success**: shortest successful game duration pu/pg
+|   8. **First Attempt Digit Score**: digit score of first attempt  
+|   9. **Last Attempt Digit Score**: digit score of final attempt  
+|   10. **Digit Score Delta**    
+|   11. **First Attempt Duration**: PIN entry time of first attempt   
+|   12. **Last Attempt Duration**: PIN entry time of last attempt  
+|   13. **Game Duration Delta**    
+
+# 3. Results / Usability Evaluation  
+
+|   In this section, we'll provide some results about game performance and difficulty as well as participant demographics. When evaluating against quantitative measures, we will look at 3 primary variables: Success Rate, Average Digit Score, and Average Duration per game. This will provide a holistic picture of successes, graded performance/error, and duration
+
+### Demographic Analysis  
+
+|   First, we will get a high-level view of who was playing these games. Then we will examine effects of demographics on game performance.  
+
+```{r fig.height=4.75,fig.width=4,out.width="33%",fig.align='default'}
+survey %>% ggplot(aes(x=age)) + 
+  geom_histogram() +
+  labs(x = "Age",y="Count",title = "Age Distribution")
+
+survey %>% filter(!is.na(gender)) %>%  ggplot(aes(x=gender)) + 
+  geom_bar() + 
+  labs(x="",y="Count",title = "Gender Distribution") +
+  geom_text(stat = "count",aes(label=..count..),vjust = -0.3)
+
+survey %>% filter(!is.na(edu_level)) %>% ggplot(aes(x=edu_level)) +
+  geom_bar() +
+  labs(x="",y="Count",title="Education Distribution") +
+  geom_text(stat = "count",aes(label=..count..),vjust = -0.3) +
+  theme(axis.text.x = element_text(angle = 30, vjust = 1.0, hjust=1))
+```
+  
+|   Now we'll briefly look for any effects on game performance. We'll regress against our 3 primary variables: Success Rate, Average Digit Score, and Average Duration.    
+
+User Success Rate  
+```{r cols.print=6}
+(summary(dem_success_rate_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+
+User Average Digit Score
+```{r cols.print=6}
+(summary(dem_digit_score_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+
+User Average Duration
+```{r cols.print=6}
+(summary(dem_duration_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+
+|   In almost every case, there does not appear to be much effect of people's demographics on game performance. Interestingly, the data shows a small but significant positive effect of age on success rate and another small but significant negative effect of gender on average digit score (males do slightly worse). These may have been chance.
+
+### Qualitative Analysis
+
+|   In this section, we will briefly examine users' perceptions of game difficulty as well as evaluate correspondence between Likert scales of difficulty and quantitative measures of difficulty by examining the covariance of the two measures.  
+
+```{r fig.height=4.75,fig.width=4,out.width="33%",fig.align='default'}
+survey %>% filter(!is.na(edu_level)) %>% ggplot(aes(x=shadow_pin_difficulty)) +
+  geom_bar(aes(fill = edu_level),stat = 'count') +
+  labs(x ="Difficulty",y="Participant Count",title="Shadow Pin Rating") +
+  geom_vline(xintercept = mean(s$shadow_pin_difficulty,na.rm=T),color = 'red') +
+  geom_text(stat="count",aes(label=..count..), vjust=-0.2)
+
+survey %>% filter(!is.na(edu_level)) %>%  ggplot(aes(x=rainbow_road_difficulty)) +
+  geom_bar(aes(fill = edu_level),stat = 'count') +
+  labs(x ="Difficulty",y="Participant Count",title="Rainbow Road Rating") +
+  geom_vline(xintercept = mean(s$rainbow_road_difficulty,na.rm=T),color = 'red') +
+  geom_text(stat="count",aes(label=..count..), vjust=-0.2)
+
+survey %>% filter(!is.na(edu_level)) %>% ggplot(aes(x=headphone_shift_difficulty)) +
+  geom_bar(aes(fill = edu_level),stat = 'count') +
+  labs(x ="Difficulty",y="Participant Count",title="Headphone Shift Rating") +
+  geom_vline(xintercept = mean(s$headphone_shift_difficulty,na.rm=T),color = 'red') +
+  geom_text(stat="count",aes(label=..count..), vjust=-0.2)
+
+survey %>% filter(!is.na(edu_level)) %>% ggplot(aes(x=hue_hunt_difficulty)) +
+  geom_bar(aes(fill = edu_level),stat = 'count') +
+  labs(x ="Difficulty",y="Participant Count",title="Hue Hunt Rating") +
+  geom_vline(xintercept = mean(s$hue_hunt_difficulty,na.rm=T),color = 'red') +
+  geom_text(stat="count",aes(label=..count..), vjust=-0.2)
+
+survey %>% filter(!is.na(edu_level)) %>% ggplot(aes(x=math_merkle_difficulty)) +
+  geom_bar(aes(fill = edu_level),stat = 'count') +
+  labs(x ="Difficulty",y="Participant Count",title="Mathematical Merkle Rating") +
+  geom_vline(xintercept = mean(s$math_merkle_difficulty,na.rm=T),color = 'red') +
+  geom_text(stat="count",aes(label=..count..), vjust=-0.2)
+
+survey %>% filter(!is.na(edu_level)) %>% ggplot(aes(x=markov_melodies_difficulty)) +
+  geom_bar(aes(fill = edu_level),stat = 'count') +
+  labs(x ="Difficulty",y="Participant Count",title="Markov Melodies Rating") +
+  geom_vline(xintercept = mean(s$markov_melodies_difficulty,na.rm=T),color = 'red') +
+  geom_text(stat="count",aes(label=..count..), vjust=-0.2)
+```
+
+|   Now we'll look at the correlation between user perception and performance.  
+
+```{r fig.height=4.75,fig.width=4,out.width="33%",fig.align='default'}
+s %>%
+  filter(game_name == 'shadow_pin') %>% 
+  ggplot(aes(x = failure_rate,y=shadow_pin_difficulty)) + 
+    geom_jitter() +
+    geom_smooth(method='lm')+
+    labs(x="Failure Rate",y="Perceived Difficulty",title = "Shadow Pin Difficulty")
+
+s %>%
+  filter(game_name == 'rainbow_road') %>% 
+  ggplot(aes(x = failure_rate,y=shadow_pin_difficulty)) + 
+    geom_jitter() +
+    geom_smooth(method='lm')+
+    labs(x="Failure Rate",y="Perceived Difficulty",title = "Rainbow Road Difficulty")
+
+s %>%
+  filter(game_name == 'headphone_shift') %>% 
+  ggplot(aes(x = failure_rate,y=shadow_pin_difficulty)) + 
+    geom_jitter() +
+    geom_smooth(method='lm')+
+    labs(x="Failure Rate",y="Perceived Difficulty",title = "Headphone Shift Difficulty")
+
+s %>%
+  filter(game_name == 'hue_hunt') %>% 
+  ggplot(aes(x = failure_rate,y=shadow_pin_difficulty)) + 
+    geom_jitter() +
+    geom_smooth(method='lm')+
+    labs(x="Failure Rate",y="Perceived Difficulty",title = "Hue Hunt Difficulty")
+
+s %>%
+  filter(game_name == 'math_merkle') %>% 
+  ggplot(aes(x = failure_rate,y=shadow_pin_difficulty)) + 
+    geom_jitter() +
+    geom_smooth(method='lm')+
+    labs(x="Failure Rate",y="Perceived Difficulty",title = "Mathematical Merkle Difficulty")
+
+s %>%
+  filter(game_name == 'markov_melodies') %>% 
+  ggplot(aes(x = failure_rate,y=shadow_pin_difficulty)) + 
+    geom_jitter() +
+    geom_smooth(method='lm')+
+    labs(x="Failure Rate",y="Perceived Difficulty",title = "Markov Melodies Difficulty")
+```
+
+| More formal analysis is required to determine if these two variables are correlated as they- in theory- should be. However, from a glance there doesn't appear to be much correlation- at least with failure rate. Perhaps we could look into correlation with abort rate.  
+
+### Quantitative Analysis
+
+Here, we will compare each game to regular PIN Entry along the 3 primary variables we've been considering using linear regression and between-subjects ANOVA. We'll also quickly look at whether people improved on the games as they played. In the end we'll provide a ranking of the games and considerations for our future work.
+
+User Success Rate  
+```{r cols.print=6}
+(summary(success_rate_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+
+User Average Digit Score
+```{r cols.print=6}
+(summary(digit_score_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+
+User Average Duration
+```{r cols.print=6}
+(summary(duration_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+
+|   From the brief evaluations here, there are some commonalities to note. First, all PIN entry methods are statistically significantly worse than normal PIN entry. This was expected as all methods involve more steps per digit while also introducing novel methods of entering a PIN.The question then becomes, which of our PIN Entry methods performed the best with users? 
+|   Based on the three above metrics, it would appear that Hue Hunt and Rainbow Road performed best among users: boasting an average digit score of around 3 for each. Headphone Shift appears to perform remarkably better than all other games on 'average duration' but the failure rate suggests that this is a fluke.
+|   However, rather than average digit score and average duration it may be more interesting to consider the 'digit score of the first attempt' and 'shortest successful game duration' per user. Roughly speaking, these might respectively relate to a proxy for: game learning curve and the performance ceiling for accurate, speedy entry. This could provide insight into the learnability of each game as well as what ideal performance might look like (given the conditions of Open day). Using these as a baseline, these values could improve in a more controlled environment.  
+  
+User Digit Score in First Attempt
+```{r cols.print=6}
+(summary(digit_score_first_attempt_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+  
+Quickest Success
+```{r cols.print=6}
+(summary(quickest_success_model)$coefficients %>% as.data.frame %>% signif(3))
+```
+  
+|   Here we see each model *potentially* pointing out which games are easiest to learn and which can be done quickly and successfully. Again Hue Hunt and Rainbow Road appear the games with the highest initial digit score. However, with quickest success we see an additional story. Presumably, those who were able to properly hear and play 'headphone shift' were able to do so fairly quickly. Seemingly quicker than Hue Hunt, Rainbow Road, and Shadow Pin. This is worth investigating further sa Headphone Shift potentially provides the best security if implemented properly.
+|   Examining the other variables from section 2, these 3 games appear to be the most successful. Except in the case of Shadow Pin which appeared to have the best 'final attempt duration'. However, as this game was explicitly taught to multiple batches at a time throughout the day, this could have biased the data. Additionally, Shadow Pin was included merely as a benchmark since it has been thoroughly review in the literature.  
+  
+Thus we will now take a close look at Hue Hunt, Rainbow Road, Headphone Shift, and Shadow Pin with respect to each other.  
+  
+
+#### Conducting t tests for differentiation in **Success Rate** (with Bonferroni Correction)  
+```{r cols.print=6}
+(str_c("Rainbow Road* - Shadow Pin: ","t = ",signif(rr_sp1$statistic,3), ", p = ",signif(rr_sp1$p.value,3)))
+
+(str_c("Hue Hunt* - Shadow Pin: ","t = ",signif(hh_sp1$statistic,3), ", p = ",signif(hh_sp1$p.value,3)))
+
+(str_c("Headphone Shift - Shadow Pin*: ","t = ",signif(hs_sp1$statistic,3), ", p = ",signif(hs_sp1$p.value,3)))
+
+(str_c("Rainbow Road - Hue Hunt: ","t = ",signif(rr_hh1$statistic,3), ", p = ",signif(rr_hh1$p.value,3)))
+
+(str_c("Rainbow Road* - Headphone Shift: ","t = ",signif(rr_hs1$statistic,3), ", p = ",signif(rr_hs1$p.value,3)))
+
+(str_c("Hue Hunt* - Headphone Shift: ","t = ",signif(hh_hs1$statistic,3), ", p = ",signif(hh_hs1$p.value,3)))
+```
+|   Applying a Bonferroni correction for 6 comparisons, gives a new significance threshold of \alpha = 0.05/6 = 0.00833. Aside from Hue Hunt and Rainbow Road- which did not differ significantly in success rate- all other pairwise comparisons presented an unambiguous ranking. With this, these are the game rankings for Success Rate:
+|   1. Hue Hunt/Rainbow Road
+|   2. Shadow Pin
+|   3. Headphone Shift  
+  
+#### Conducting t tests for differentiation in **Digit Score in first attempt** (with Bonferroni Correction)  
+```{r cols.print=6}
+(str_c("Rainbow Road* - Shadow Pin: ","t = ",signif(rr_sp3$statistic,3), ", p = ",signif(rr_sp3$p.value,3)))
+
+(str_c("Hue Hunt* - Shadow Pin: ","t = ",signif(hh_sp3$statistic,3), ", p = ",signif(hh_sp3$p.value,3)))
+
+(str_c("Headphone Shift - Shadow Pin: ","t = ",signif(hs_sp3$statistic,3), ", p = ",signif(hs_sp3$p.value,3)))
+
+(str_c("Rainbow Road - Hue Hunt: ","t = ",signif(rr_hh3$statistic,3), ", p = ",signif(rr_hh3$p.value,3)))
+
+(str_c("Rainbow Road* - Headphone Shift: ","t = ",signif(rr_hs3$statistic,3), ", p = ",signif(rr_hs3$p.value,3)))
+
+(str_c("Hue Hunt* - Headphone Shift: ","t = ",signif(hh_hs3$statistic,3), ", p = ",signif(hh_hs3$p.value,3)))
+```
+|   Applying a Bonferroni correction for 6 comparisons, gives a new significance threshold of \alpha = 0.05/6 = 0.00833. Again Hue Hunt and Rainbow Road afford significantly higher first-time digit scores than other games; possibly suggesting a lower learning curve for these games. Headphone Shift and Shadow Pin had no significant difference in first-attempt digit scores. With this, these are the game rankings for Digit Score in the First Attempt:
+|   1. Hue Hunt/Rainbow Road
+|   2. Shadow Pin/Headphone Shift  
+
+#### Conducting t test for differentiation in **Quickest Success** (with Bonferroni Correction)
+
+```{r cols.print=6}
+(str_c("Rainbow Road - Shadow Pin: ","t = ",signif(rr_sp2$statistic,3), ", p = ",signif(rr_sp2$p.value,3)))
+
+(str_c("Hue Hunt - Shadow Pin*: ","t = ",signif(hh_sp2$statistic,3), ", p = ",signif(hh_sp2$p.value,3)))
+
+(str_c("Headphone Shift - Shadow Pin: ","t = ",signif(hs_sp2$statistic,3), ", p = ",signif(hs_sp2$p.value,3)))
+
+(str_c("Rainbow Road* - Hue Hunt: ","t = ",signif(rr_hh2$statistic,3), ", p = ",signif(rr_hh2$p.value,3)))
+
+(str_c("Rainbow Road - Headphone Shift: ","t = ",signif(rr_hs2$statistic,3), ", p = ",signif(rr_hs2$p.value,3)))
+
+(str_c("Hue Hunt - Headphone Shift*: ","t = ",signif(hh_hs2$statistic,3), ", p = ",signif(hh_hs2$p.value,3)))
+```
+|   Applying a Bonferroni correction for 6 comparisons, gives a new significance threshold of \alpha = 0.05/6 = 0.00833. Headphone Shift and Shadow Pin appear to dominate in terms of duration of successful entries. Between Headphone Shift and Shadow Pin there was no significant difference. Headphone Shift and Rainbow Road too had no statistically significant difference. Of successful attempts, it seems Hue Hunt ranked the lowest. These are the game rankings for Quickest Success:
+|   1. Headphone Shift/Shadow Pin/Rainbow Road
+|   2. Hue Hunt  
+  
+#### Did participants improve as they played?  
+|    We will look at whether participants improved or not in both digit score and duration as they played multiple times. We will only consider if improvement occurred in Shadow Pin, Headphone Shift, Hue Hunt and Rainbow Road.  
+
+Improvement in Digit Score  
+
+```{r}
+(s %>% filter(!is.na(outcome_delta),game_name != 'markov_melodies') %>% 
+  ggplot(aes(x=digit_score_first_attempt,y = digit_score_last_attempt)) +
+    geom_jitter(aes(color = outcome_delta)) +
+    facet_wrap(~game_name) +
+    labs(x = "Digit Score First",y="Digit Score Last")+
+    geom_abline(a=1,b=0)
+)
+
+(str_c("Shadow Pin: ",signif(sp_improve1$statistic,3),", p = ",signif(sp_improve1$p.value,3)))
+(str_c("Headphone Shift: ",signif(hs_improve1$statistic,3),", p = ",signif(hs_improve1$p.value,3)))
+(str_c("Hue Hunt: ",signif(hh_improve1$statistic,3),", p = ",signif(hh_improve1$p.value,3)))
+(str_c("Rainbow Road: ",signif(rr_improve1$statistic,3),", p = ",signif(rr_improve1$p.value,3)))
+
+```
+  
+  
+|   All games except Hue Hunt had a significant positive delta in digit score from the first to the last attempt. This gives credence to the idea that when played multiple times, users improve in these games. Note that it is not representative of overall success as a user may have a delta of 0 on account of succeeding through and through.  
+
+Improvement in Duration  
+
+```{r}
+(s %>% filter(!is.na(outcome_delta),game_name != 'regular_pin_entry',duration_last_attempt < 3000,duration_first_attempt < 240) %>% 
+  ggplot(aes(x=duration_first_attempt,y = duration_last_attempt)) +
+    geom_point(aes(color = outcome_delta)) +
+    facet_wrap(~game_name) +
+    labs(x = "Duration First",y="Duration Last") +
+    geom_abline(a=1)
+)
+
+(str_c("Shadow Pin: ",signif(sp_improve2$statistic,3),", p = ",signif(sp_improve2$p.value,3)))
+(str_c("Headphone Shift: ",signif(hs_improve2$statistic,3),", p = ",signif(hs_improve2$p.value,3)))
+(str_c("Hue Hunt: ",signif(hh_improve2$statistic,3),", p = ",signif(hh_improve2$p.value,3)))
+(str_c("Rainbow Road: ",signif(rr_improve2$statistic,3),", p = ",signif(rr_improve2$p.value,3)))
+
+```
+  
+|    Only Shadow Pin and Hue Hunt had significant decrease in game duration from the first to the last attempt. This gives credence to the idea that when played multiple times, users improve in these games. Note that it is not representative of overall success as a user may have entered erroneous digits quickly thus not actually succeeding in pin entry.
+
+
+# 4. Conclusion / Future Work
+
+
+  
+
